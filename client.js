@@ -21,7 +21,7 @@ window.__ModuleLoader__.load({
     const SETTINGS_KEY = PLUGIN_ID + ':settings';
     const LOCALE_NS = 'settings.aniplus';
 
-    const GROUP_KEYS = ['menus', 'dialogs', 'toasts', 'sidebar', 'rightbar', 'lists', 'chat', 'micro', 'pages', 'exits'];
+    const GROUP_KEYS = ['menus', 'dialogs', 'toasts', 'sidebar', 'rightbar', 'lists', 'chat', 'micro', 'pages', 'exits', 'dock', 'press'];
     const INTENSITIES = ['subtle', 'standard', 'expressive'];
     const DEFAULT_SETTINGS = Object.freeze({
       enabled: true,
@@ -37,6 +37,8 @@ window.__ModuleLoader__.load({
         micro: true,
         pages: true,
         exits: true,
+        dock: true,
+        press: true,
       }),
     });
 
@@ -143,6 +145,10 @@ window.__ModuleLoader__.load({
       '[role="tooltip"]',
       '[data-quote-popover]',
       '[data-document-viewer-menu]',
+      '[style*="position-anchor: --dsh-context-"]',
+      '[style*="position-anchor:--dsh-context-"]',
+      '[style*="position-anchor: --dsh-stat-"]',
+      '[style*="position-anchor:--dsh-stat-"]',
     ].join(',');
     const EXIT_HINT = '[data-menu-material], [role="dialog"], [role="tooltip"], [data-quote-popover], [data-document-viewer-menu], [role="presentation"]';
     const EXIT_KINDS = [
@@ -150,6 +156,10 @@ window.__ModuleLoader__.load({
       ['[role="tooltip"]', 'tooltip'],
       ['[data-quote-popover]', 'menu'],
       ['[data-document-viewer-menu]', 'menu'],
+      ['[style*="position-anchor: --dsh-context-"]', 'menu'],
+      ['[style*="position-anchor:--dsh-context-"]', 'menu'],
+      ['[style*="position-anchor: --dsh-stat-"]', 'menu'],
+      ['[style*="position-anchor:--dsh-stat-"]', 'menu'],
     ];
     const EXIT_ANIMATIONS = {
       menu: 'anip-ghost-menu-out',
@@ -242,7 +252,9 @@ window.__ModuleLoader__.load({
         if (kind === 'menu') {
           const modelMenu = target instanceof HTMLElement && target.style.getPropertyValue('--dsh-model-anchor') !== '';
           const composerOverlay = target.hasAttribute('data-anip-composer-overlay') || target.hasAttribute('data-trigger-menu');
-          const side = modelMenu || composerOverlay ? 'top' : (target.getAttribute('data-anchor-side') || 'bottom');
+          const styleAttr = target.getAttribute('style') || '';
+          const dockPanel = styleAttr.includes('position-anchor: --dsh-context-') || styleAttr.includes('position-anchor:--dsh-context-') || styleAttr.includes('position-anchor: --dsh-stat-') || styleAttr.includes('position-anchor:--dsh-stat-');
+          const side = modelMenu || composerOverlay || dockPanel ? 'top' : (target.getAttribute('data-anchor-side') || 'bottom');
           const align = target.getAttribute('data-anchor-align');
           let origin = 'top center';
           if (side === 'top') origin = 'bottom center';
@@ -359,6 +371,176 @@ window.__ModuleLoader__.load({
       };
     }
 
+    /* ------------------------------------------------------- press feedback -- */
+
+    const TILT_SELECTOR = '[data-menu-material="translucent"]';
+    const SINK_SELECTOR = '[data-composer-dock] button[aria-haspopup="dialog"]';
+
+    /**
+     * Miuix SinkFeedback port plus a pointer-follow tilt, refactored:
+     * tilt now tracks the pointer continuously over small menu panels only,
+     * driven by a damped rAF loop (tilt-refactor: no corner quantization, no
+     * CSS transition on transform) and rebounds smoothly after the pointer
+     * leaves. Dock triggers keep the press sink. One element at a time.
+     */
+    function installPressFeedback(settings) {
+      if (typeof document === 'undefined' || typeof window === 'undefined') return () => {};
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+      // tilt-refactor: damping knobs. tau = exponential time constant of the
+      // follow (larger = softer/slower), eps = settle threshold, size guard
+      // keeps the effect on small menu panels only. All tunable.
+      const TILT_TAU_MS = 70;
+      const TILT_SETTLE_EPS = 0.05;
+      const TILT_MAX_WIDTH = 420;
+      const TILT_MAX_HEIGHT = 480;
+      let tracked = null; // { el, maxDeg }
+      let pressed = null;
+      let raf = 0;
+      let last = 0;
+      let rx = 0;
+      let ry = 0;
+      let trx = 0;
+      let tryTarget = 0;
+
+      function allowed() {
+        const current = settings.get();
+        return current.enabled && current.groups.press && !reduced.matches;
+      }
+
+      function clearTilt(el) {
+        if (el === null) return;
+        el.style.removeProperty('--anip-tilt-rx');
+        el.style.removeProperty('--anip-tilt-ry');
+      }
+
+      function stopLoop() {
+        if (raf !== 0) {
+          window.cancelAnimationFrame(raf);
+          raf = 0;
+        }
+      }
+
+      // tilt-refactor: one damped-lerp loop owns the whole tilt lifecycle:
+      // follow while the pointer is inside, rebound to rest after it leaves,
+      // and self-stop once settled (vars removed so CSS falls back to 0deg).
+      function frame(now) {
+        raf = 0;
+        if (tracked === null || !tracked.el.isConnected) {
+          clearTilt(tracked === null ? null : tracked.el);
+          tracked = null;
+          return;
+        }
+        if (!allowed()) {
+          trx = 0;
+          tryTarget = 0;
+        }
+        const dt = Math.min(64, now - last);
+        last = now;
+        const k = 1 - Math.exp(-dt / TILT_TAU_MS);
+        rx += (trx - rx) * k;
+        ry += (tryTarget - ry) * k;
+        tracked.el.style.setProperty('--anip-tilt-rx', rx.toFixed(2) + 'deg');
+        tracked.el.style.setProperty('--anip-tilt-ry', ry.toFixed(2) + 'deg');
+        if (trx === 0 && tryTarget === 0 && Math.abs(rx) < TILT_SETTLE_EPS && Math.abs(ry) < TILT_SETTLE_EPS) {
+          clearTilt(tracked.el);
+          tracked = null;
+          return;
+        }
+        raf = window.requestAnimationFrame(frame);
+      }
+
+      function beginTracking(el) {
+        const rect = el.getBoundingClientRect();
+        if (rect.width < 1 || rect.height < 1 || rect.width > TILT_MAX_WIDTH || rect.height > TILT_MAX_HEIGHT) return;
+        const maxDeg = Math.abs(parseFloat(window.getComputedStyle(el).getPropertyValue('--anip-tilt-amount')) || 0) || 4;
+        if (tracked !== null && tracked.el !== el) clearTilt(tracked.el);
+        tracked = { el, maxDeg };
+        rx = 0;
+        ry = 0;
+        trx = 0;
+        tryTarget = 0;
+        last = window.performance.now();
+        if (raf === 0) raf = window.requestAnimationFrame(frame);
+      }
+
+      function onPointerOver(event) {
+        if (!allowed()) return;
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        if (tracked !== null && tracked.el.contains(target)) return;
+        const el = target.closest(TILT_SELECTOR);
+        if (el === null) return;
+        beginTracking(el);
+      }
+
+      function onPointerMove(event) {
+        if (tracked === null || raf === 0) return;
+        const target = event.target;
+        if (!(target instanceof Element) || !tracked.el.contains(target)) return;
+        const rect = tracked.el.getBoundingClientRect();
+        const nx = Math.max(-1, Math.min(1, ((event.clientX - rect.left) / rect.width) * 2 - 1));
+        const ny = Math.max(-1, Math.min(1, ((event.clientY - rect.top) / rect.height) * 2 - 1));
+        // Signs keep the Miuix convention: the panel leans into the pointer,
+        // as if the hovered point were pushed down.
+        trx = -ny * tracked.maxDeg;
+        tryTarget = nx * tracked.maxDeg;
+      }
+
+      function onPointerOut(event) {
+        if (tracked === null) return;
+        const related = event.relatedTarget;
+        if (related instanceof Element && tracked.el.contains(related)) return;
+        trx = 0;
+        tryTarget = 0;
+      }
+
+      function onPointerDown(event) {
+        if (!allowed()) return;
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        const sink = target.closest(SINK_SELECTOR);
+        if (sink !== null) {
+          sink.setAttribute('data-anip-pressed', '');
+          pressed = sink;
+        }
+      }
+
+      function onPointerUp() {
+        if (pressed !== null) pressed.removeAttribute('data-anip-pressed');
+        pressed = null;
+      }
+
+      document.addEventListener('pointerover', onPointerOver);
+      document.addEventListener('pointermove', onPointerMove);
+      document.addEventListener('pointerout', onPointerOut);
+      document.addEventListener('pointerdown', onPointerDown, true);
+      window.addEventListener('pointerup', onPointerUp, { passive: true });
+      window.addEventListener('pointercancel', onPointerUp, { passive: true });
+      const unsubscribe = settings.subscribe(() => {
+        if (!allowed()) {
+          trx = 0;
+          tryTarget = 0;
+          if (pressed !== null) pressed.removeAttribute('data-anip-pressed');
+          pressed = null;
+        }
+      });
+
+      return () => {
+        stopLoop();
+        clearTilt(tracked === null ? null : tracked.el);
+        tracked = null;
+        if (pressed !== null) pressed.removeAttribute('data-anip-pressed');
+        pressed = null;
+        document.removeEventListener('pointerover', onPointerOver);
+        document.removeEventListener('pointermove', onPointerMove);
+        document.removeEventListener('pointerout', onPointerOut);
+        document.removeEventListener('pointerdown', onPointerDown, true);
+        window.removeEventListener('pointerup', onPointerUp);
+        window.removeEventListener('pointercancel', onPointerUp);
+        unsubscribe();
+      };
+    }
+
     /* --------------------------------------------------------------- motion -- */
 
     const MOTION_CSS = String.raw`/* == ANIP_CSS_START == */
@@ -389,6 +571,19 @@ window.__ModuleLoader__.load({
   --anip-row-duration: 150ms;
   --anip-chat-distance: 6px;
   --anip-chat-duration: 200ms;
+  /* Miuix-derived curves: springs precomputed from the exact ODE
+     (damping/stiffness taken from Miuix source, see README Credits). */
+  --anip-ease-miuix-popup: linear(0, 2.5% 0.0163, 5% 0.0588, 7.5% 0.1191, 10% 0.1906, 12.5% 0.268, 15% 0.3474, 17.5% 0.4258, 20% 0.5009, 22.5% 0.5714, 25% 0.6363, 27.5% 0.6951, 30% 0.7476, 32.5% 0.7938, 35% 0.8341, 37.5% 0.8687, 40% 0.8981, 42.5% 0.9227, 45% 0.9432, 47.5% 0.9599, 50% 0.9734, 52.5% 0.9841, 55% 0.9924, 57.5% 0.9988, 60% 1.0034, 62.5% 1.0067, 65% 1.0089, 67.5% 1.0103, 70% 1.0109, 72.5% 1.0111, 75% 1.0109, 77.5% 1.0103, 80% 1.0096, 82.5% 1.0088, 85% 1.008, 87.5% 1.0071, 90% 1.0062, 92.5% 1.0054, 95% 1.0046, 97.5% 1.0039, 100% 1.0033);
+  --anip-ease-miuix-sink: linear(0, 2.5% 0.0173, 5% 0.0622, 7.5% 0.1259, 10% 0.2011, 12.5% 0.2823, 15% 0.3653, 17.5% 0.4468, 20% 0.5245, 22.5% 0.5969, 25% 0.6631, 27.5% 0.7226, 30% 0.7751, 32.5% 0.8209, 35% 0.8603, 37.5% 0.8936, 40% 0.9215, 42.5% 0.9445, 45% 0.9631, 47.5% 0.9779, 50% 0.9894, 52.5% 0.9982, 55% 1.0047, 57.5% 1.0093, 60% 1.0123, 62.5% 1.0141, 65% 1.015, 67.5% 1.0151, 70% 1.0147, 72.5% 1.014, 75% 1.0129, 77.5% 1.0118, 80% 1.0105, 82.5% 1.0093, 85% 1.0081, 87.5% 1.0069, 90% 1.0058, 92.5% 1.0048, 95% 1.004, 97.5% 1.0032, 100% 1.0025);
+  --anip-ease-miuix-alpha: cubic-bezier(0.4, 0, 0.2, 1);
+  --anip-dock-duration: 400ms;
+  --anip-dock-distance: 6px;
+  --anip-dock-scale: 0.97;
+  --anip-tilt-amount: 4deg;
+  --anip-tilt-perspective: 900px;
+  --anip-tilt-tau: 70ms;
+  --anip-sink-scale: 0.94;
+  --anip-press-sink-duration: 320ms;
 }
 
 /* The theme layer repeats this through overrideTokens; the CSS fallback keeps
@@ -408,6 +603,11 @@ html[data-anip-intensity="subtle"] {
   --anip-toast-distance: 6px;
   --anip-row-distance: 2px;
   --anip-chat-distance: 3px;
+  --anip-dock-duration: 340ms;
+  --anip-dock-distance: 3px;
+  --anip-dock-scale: 0.99;
+  --anip-tilt-amount: 3deg;
+  --anip-sink-scale: 0.96;
 }
 
 html[data-anip-intensity="expressive"] {
@@ -421,6 +621,11 @@ html[data-anip-intensity="expressive"] {
   --anip-toast-distance: 14px;
   --anip-row-distance: 6px;
   --anip-chat-distance: 10px;
+  --anip-dock-duration: 460ms;
+  --anip-dock-distance: 10px;
+  --anip-dock-scale: 0.96;
+  --anip-tilt-amount: 5deg;
+  --anip-sink-scale: 0.93;
 }
 
 /* 02 — menus, popovers, context menus and tooltips. */
@@ -798,6 +1003,47 @@ html[data-anip="on"] [data-menu-material="translucent"] {
   z-index: 2147483000;
 }
 
+/* 09a — dock panels: composer bottom info indicator pop-ups
+   (ContextMeter and StatsPills dialogs; entrance is pure CSS via
+   @starting-style because the host mounts them fresh on open). */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-anip="on"][data-anip-ready]:not(.anip-off-dock) [style*="position-anchor: --dsh-context-"],
+  html[data-anip="on"][data-anip-ready]:not(.anip-off-dock) [style*="position-anchor:--dsh-context-"],
+  html[data-anip="on"][data-anip-ready]:not(.anip-off-dock) [style*="position-anchor: --dsh-stat-"],
+  html[data-anip="on"][data-anip-ready]:not(.anip-off-dock) [style*="position-anchor:--dsh-stat-"] {
+    transform-origin: bottom center;
+    transition:
+      opacity 200ms var(--anip-ease-miuix-alpha),
+      translate var(--anip-dock-duration) var(--anip-ease-miuix-popup),
+      scale var(--anip-dock-duration) var(--anip-ease-miuix-popup),
+      filter 200ms var(--anip-ease-miuix-alpha);
+    @starting-style {
+      opacity: 0;
+      translate: 0 var(--anip-dock-distance);
+      scale: var(--anip-dock-scale);
+      filter: blur(var(--anip-dialog-blur));
+    }
+  }
+}
+
+/* 09b — press feedback (tilt-refactor: hover-follow tilt on small menu
+   panels; the damped rAF loop in installPressFeedback owns the motion, so
+   there is deliberately no CSS transition on transform. Dock triggers keep
+   the press sink). */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-anip="on"][data-anip-ready]:not(.anip-off-press) [data-menu-material="translucent"] {
+    transform: perspective(var(--anip-tilt-perspective)) rotateX(var(--anip-tilt-rx, 0deg)) rotateY(var(--anip-tilt-ry, 0deg));
+    transform-origin: center;
+  }
+  html[data-anip="on"]:not(.anip-off-press) [data-composer-dock] button[aria-haspopup="dialog"] {
+    scale: 1;
+    transition: scale var(--anip-press-sink-duration) var(--anip-ease-miuix-sink);
+  }
+  html[data-anip="on"]:not(.anip-off-press) [data-composer-dock] button[aria-haspopup="dialog"][data-anip-pressed] {
+    scale: var(--anip-sink-scale);
+  }
+}
+
 /* 10 — settings page (always themed, independent of the motion gate). */
 .anip-heading {
   display: flex;
@@ -1000,6 +1246,8 @@ html[data-anip="on"] [data-menu-material="translucent"] {
       groupMicro: 'Micro-interactions',
       groupPages: 'Pages and panels',
       groupExits: 'Retract animations',
+      groupDock: 'Dock panels',
+      groupPress: 'Press & tilt feedback',
       reset: 'Reset to defaults',
     };
     const ZH = {
@@ -1025,6 +1273,8 @@ html[data-anip="on"] [data-menu-material="translucent"] {
       groupMicro: '微交互',
       groupPages: '页面与面板',
       groupExits: '收起动画',
+      groupDock: '底部信息面板',
+      groupPress: '按压与倾斜反馈',
       reset: '恢复默认',
     };
     const LOCALE_DICTS = { en: EN, zh: ZH, ja: EN, es: EN, fr: EN, de: EN, ru: EN, pt: EN };
@@ -1040,6 +1290,8 @@ html[data-anip="on"] [data-menu-material="translucent"] {
       micro: 'groupMicro',
       pages: 'groupPages',
       exits: 'groupExits',
+      dock: 'groupDock',
+      press: 'groupPress',
     };
 
     /* ------------------------------------------------------------- settings UI -- */
@@ -1170,6 +1422,11 @@ html[data-anip="on"] [data-menu-material="translucent"] {
         const controller = createExitGhostController(settingsStore);
         return () => { controller.dispose(); };
       }, PLUGIN_ID + ': retract ghosts');
+
+      ctx.effect(() => {
+        const dispose = installPressFeedback(settingsStore);
+        return () => { dispose(); };
+      }, PLUGIN_ID + ': press feedback');
 
       ctx.effect(() => {
         let first = 0;

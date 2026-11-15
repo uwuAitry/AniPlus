@@ -46,6 +46,11 @@ of fading away in place.
   last few conversation rows rise and fade without fighting host FLIP animations.
 - **Micro-interactions** — switch thumb spring, segmented-tab indicator glide, row
   hover nudge and scroll-to-bottom pop-in.
+- **Dock panels** — the composer's bottom info indicator pop-up (context meter, stats pills)
+  rises from its trigger with a spring `translate + scale` and a blur-in; closing retracts
+  down toward the trigger through the retract-ghost path.
+- **Press feedback** — small menu panels tilt gently toward the pointer with a damped follow and
+  rebound on leave; dock triggers sink on press (Miuix SinkFeedback port).
 - **Settings page** — Settings → **AniPlus** with a master switch, three intensity
   levels, per-group switches and reset.
 
@@ -87,7 +92,7 @@ Open **Settings → AniPlus**:
 |---|---|
 | Motion enabled | Master switch; off restores the native DSH feel without uninstalling. |
 | Intensity | `Subtle` / `Standard` / `Expressive`: distance, scale and duration. |
-| Motion groups | Menus, dialogs, notifications, retract animations, left sidebar, right sidebar, lists, conversation, micro-interactions, pages. |
+| Motion groups | Menus, dialogs, notifications, retract animations, left sidebar, right sidebar, lists, conversation, micro-interactions, pages, dock panels, press & tilt feedback. |
 | Reset to defaults | Restores the standard profile. |
 
 Settings are stored in the current browser under `dsh-aniplus:settings`; they are
@@ -101,6 +106,13 @@ not written into the DSH profile and changes apply immediately.
 | `--anip-ease-standard` | `cubic-bezier(0.22, 1, 0.36, 1)` | structure motion and the global `--ds-ease-in-out` replacement |
 | `--anip-ease-exit` | `cubic-bezier(0.4, 0, 1, 1)` | returns and dismissals: accelerate away |
 | `--anip-ease-spring` | `cubic-bezier(0.34, 1.36, 0.64, 1)` | small elements only: toast, switch, scroll button |
+| `--anip-ease-miuix-popup` / `-sink` | precomputed `linear()` springs | dock panel entrance; press sink (Miuix) |
+| `--anip-ease-miuix-alpha` | `cubic-bezier(0.4, 0, 0.2, 1)` | dock panel opacity + blur fade |
+| `--anip-dock-duration` / `-distance` / `-scale` | `400ms` / `6px` / `0.97` (per intensity) | dock panel entrance |
+| `--anip-tilt-amount` / `--anip-tilt-perspective` | `4deg` / `900px` | menu tilt-follow angle cap |
+| `--anip-tilt-tau` | `70ms` | tilt follow damping (JS rAF loop) |
+| `--anip-sink-scale` | `0.94` | dock trigger press sink |
+| `--anip-press-sink-duration` | `320ms` | press sink settle |
 
 Durations follow a 90 / 150 / 200 / 280–320 ms scale. Distances are deliberately
 small (`2–12px`) and scale values are kept between `0.96` and `0.99`.
@@ -200,6 +212,10 @@ AniPlus/
    ```sh
    gh release create vX.Y.Z dsh-aniplus-<version>.tgz --title "AniPlus vX.Y.Z" --generate-notes
    ```
+
+## Credits
+
+Press-feedback and spring-animation parameters adapted from [Miuix](https://github.com/compose-miuix-ui/miuix), Apache License 2.0, © compose-miuix-ui contributors. Reimplemented as CSS; no source code copied.
 
 ## License
 
