@@ -31,12 +31,17 @@ git clone https://github.com/uwuAitry/AniPlus.git
 
 然后任选其一：
 
-1. 在 DSH 中打开 **插件 → 添加插件**，选择克隆下来的 `AniPlus` 目录；
-2. 或通过 CLI 安装：
+1. 从 npm 安装：
 
-```sh
-dsh plugin --profile <profile> add <AniPlus 路径>
-```
+   ```sh
+   dsh plugin --profile <profile> add dsh-aniplus
+   ```
+
+2. 或安装克隆下来的目录：
+
+   ```sh
+   dsh plugin --profile <profile> add <AniPlus 路径>
+   ```
 
 bundle id 是 `dsh-aniplus`，显示名为 **dsh-AniPlus**。如果插件行提示 `restart-required`，重启一次 DSH。
 

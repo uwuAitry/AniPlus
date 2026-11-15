@@ -45,12 +45,17 @@ git clone https://github.com/uwuAitry/AniPlus.git
 
 Then either:
 
-1. In DSH, open **Plugins → Add plugin** and select the cloned `AniPlus` directory, or
-2. Install through the CLI:
+1. Install from npm:
 
-```sh
-dsh plugin --profile <profile> add <path-to-AniPlus>
-```
+   ```sh
+   dsh plugin --profile <profile> add dsh-aniplus
+   ```
+
+2. Or install the cloned directory:
+
+   ```sh
+   dsh plugin --profile <profile> add <path-to-AniPlus>
+   ```
 
 The bundle id is `dsh-aniplus`; the display name is **dsh-AniPlus**. If the plugin
 row reports `restart-required`, restart DSH once.

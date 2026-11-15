@@ -1,7 +1,9 @@
 {
   "name": "dsh-aniplus",
   "version": "0.1.0",
-  "private": true,
+  "publishConfig": {
+    "access": "public"
+  },
   "description": "Directional non-linear motion for the DSH web UI: menus, dialogs, lists, sidebar, chat and micro-interactions.",
   "license": "MIT",
   "author": "uwuAitry",
