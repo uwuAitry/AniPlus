@@ -1,0 +1,5 @@
+# dsh-AniPlus: one Host row so the Loader knows the bundle. Every visible
+# effect lives in the browser half (exports["./client"]).
+- insert:
+    - id: dsh-aniplus
+      name: 'dsh-aniplus'

@@ -1,0 +1,63 @@
+{
+  "name": "dsh-aniplus",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Directional non-linear motion for the DSH web UI: menus, dialogs, lists, sidebar, chat and micro-interactions.",
+  "license": "MIT",
+  "author": "uwuAitry",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/uwuAitry/AniPlus.git"
+  },
+  "homepage": "https://github.com/uwuAitry/AniPlus#readme",
+  "bugs": {
+    "url": "https://github.com/uwuAitry/AniPlus/issues"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "plugin",
+    "animation",
+    "motion",
+    "css",
+    "transition",
+    "nonlinear",
+    "ui"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "README.md",
+    "README.zh-CN.md",
+    "docs",
+    "icon.svg",
+    "verify.mjs",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-locale"
+      ]
+    },
+    "compatibility": {
+      "dsh": "0.2.2-rc.3"
+    }
+  }
+}
