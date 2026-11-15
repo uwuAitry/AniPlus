@@ -1,4 +1,21 @@
-# dsh-AniPlus
+<p align="center">
+  <img src="icon.svg" width="72" alt="AniPlus icon" />
+</p>
+
+<h1 align="center">dsh-AniPlus</h1>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/dsh-aniplus"><img alt="npm version" src="https://img.shields.io/npm/v/dsh-aniplus?style=flat-square" /></a>
+  <a href="https://www.npmjs.com/package/dsh-aniplus"><img alt="npm downloads" src="https://img.shields.io/npm/dm/dsh-aniplus?style=flat-square" /></a>
+  <a href="https://github.com/uwuAitry/AniPlus/releases"><img alt="GitHub release" src="https://img.shields.io/github/v/release/uwuAitry/AniPlus?style=flat-square" /></a>
+  <a href="https://github.com/uwuAitry/AniPlus/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/github/license/uwuAitry/AniPlus?style=flat-square" /></a>
+  <img alt="DSH compatibility" src="https://img.shields.io/badge/dsh-0.2.2--rc.3-4b8dff?style=flat-square" />
+  <a href="https://github.com/deepseek-ai/deepseek-harness"><img alt="powered by dsh" src="https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white" /></a>
+</p>
+
+<p align="center">
+  English | <a href="./README.zh-CN.md">简体中文</a>
+</p>
 
 **Directional, non-linear motion for the DSH web UI.**
 
@@ -14,8 +31,8 @@ of fading away in place.
 
 - **Menus and popovers** — every `MenuSurface` (model picker, command palette,
   permission presets, slash menu, context menus, submenus) enters from its anchor
-  direction with a short `translate + scale`; transient material opacity keeps the
-  composer placeholder from bleeding through while the surface settles.
+  direction with a short `translate + scale`; the entrance beat uses a briefly
+  opaque material so the composer placeholder cannot bleed through.
 - **Dialogs and panels** — modals, Settings, approval dialogs and page panels use a
   soft `scale + rise + blur` entrance; closing overlays are replayed as a short
   directional ghost.
@@ -30,32 +47,34 @@ of fading away in place.
 - **Micro-interactions** — switch thumb spring, segmented-tab indicator glide, row
   hover nudge and scroll-to-bottom pop-in.
 - **Settings page** — Settings → **AniPlus** with a master switch, three intensity
-  levels (`Subtle`, `Standard`, `Expressive`), per-group switches and reset.
+  levels, per-group switches and reset.
 
 All added motion is opt-in under `prefers-reduced-motion: no-preference`; when the
 OS asks for reduced motion, the plugin adds nothing.
 
 ## Install
 
-Clone the repository:
+### From npm
+
+```sh
+dsh plugin --profile <profile> add dsh-aniplus
+```
+
+### From a release archive
+
+Download `dsh-aniplus-<version>.tgz` from
+[Releases](https://github.com/uwuAitry/AniPlus/releases), then:
+
+```sh
+dsh plugin --profile <profile> add ./dsh-aniplus-<version>.tgz
+```
+
+### From source
 
 ```sh
 git clone https://github.com/uwuAitry/AniPlus.git
+dsh plugin --profile <profile> add ./AniPlus
 ```
-
-Then either:
-
-1. Install from npm:
-
-   ```sh
-   dsh plugin --profile <profile> add dsh-aniplus
-   ```
-
-2. Or install the cloned directory:
-
-   ```sh
-   dsh plugin --profile <profile> add <path-to-AniPlus>
-   ```
 
 The bundle id is `dsh-aniplus`; the display name is **dsh-AniPlus**. If the plugin
 row reports `restart-required`, restart DSH once.
@@ -126,13 +145,14 @@ stops matching and becomes a no-op instead of hitting the wrong element.
 ## Development
 
 ```sh
-node verify.mjs
+node verify.mjs   # offline contract checks against the installed DSH
 ```
 
 The checker validates manifest shape, locale resources, icon limits, CSS brace
 balance, keyframe names, attribute existence against the installed DSH client
-packages, slot names, reduced-motion wrapping and the one bounded
-`MutationObserver` used by retract ghosts.
+packages, slot names, reduced-motion wrapping and the single bounded
+`MutationObserver` used by retract ghosts. `DSH_INSTALL_DIR` may point the checks
+at another installation.
 
 ```text
 AniPlus/
@@ -148,6 +168,38 @@ AniPlus/
 ├─ verify.mjs
 └─ LICENSE
 ```
+
+## Publishing (maintainers)
+
+1. Run the offline checks:
+
+   ```sh
+   node verify.mjs
+   ```
+
+2. Bump the version in `package.json`, commit, and tag:
+
+   ```sh
+   git commit -am "release: vX.Y.Z"
+   git tag -a vX.Y.Z -m "AniPlus vX.Y.Z"
+   git push origin main vX.Y.Z
+   ```
+
+3. Build and publish the tarball:
+
+   ```sh
+   npm pack                      # or: pnpm pack
+   npm publish dsh-aniplus-<version>.tgz --access public
+   ```
+
+   `publishConfig.access` is already set to `public`; an npm account with an
+   `automation` token (`npm login` or `NPM_TOKEN`) is required for the publish step.
+
+4. Attach the tarball to a GitHub release:
+
+   ```sh
+   gh release create vX.Y.Z dsh-aniplus-<version>.tgz --title "AniPlus vX.Y.Z" --generate-notes
+   ```
 
 ## License
 

@@ -1,4 +1,21 @@
-# dsh-AniPlus
+<p align="center">
+  <img src="icon.svg" width="72" alt="AniPlus icon" />
+</p>
+
+<h1 align="center">dsh-AniPlus</h1>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/dsh-aniplus"><img alt="npm version" src="https://img.shields.io/npm/v/dsh-aniplus?style=flat-square" /></a>
+  <a href="https://www.npmjs.com/package/dsh-aniplus"><img alt="npm downloads" src="https://img.shields.io/npm/dm/dsh-aniplus?style=flat-square" /></a>
+  <a href="https://github.com/uwuAitry/AniPlus/releases"><img alt="GitHub release" src="https://img.shields.io/github/v/release/uwuAitry/AniPlus?style=flat-square" /></a>
+  <a href="https://github.com/uwuAitry/AniPlus/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/github/license/uwuAitry/AniPlus?style=flat-square" /></a>
+  <img alt="DSH compatibility" src="https://img.shields.io/badge/dsh-0.2.2--rc.3-4b8dff?style=flat-square" />
+  <a href="https://github.com/deepseek-ai/deepseek-harness"><img alt="powered by dsh" src="https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white" /></a>
+</p>
+
+<p align="center">
+  <a href="./README.md">English</a> | 简体中文
+</p>
 
 **给 DSH Web UI 的“有方向”的非线性动效层。**
 
@@ -17,31 +34,33 @@ dsh-AniPlus 是一个客户端 DSH 插件，为菜单、窗口、列表、侧栏
 - **左右侧栏** — 轨道时长仍归宿主（不会拖慢 `dsh-perf-tuner` 的 fast 档），只替换缓动；内容行有轻微入场。
 - **列表与对话** — 会话、文件、插件、计划任务行，以及对话区最后几行做轻微上浮淡入，不干扰宿主 FLIP 动画。
 - **微交互** — Switch 滑块回弹、SegmentedTabs 指示条滑动、行 hover 位移、滚动到底按钮弹入。
-- **设置页** — 设置 → **AniPlus**：总开关、三档强度（克制 / 标准 / 活泼）、分组开关、恢复默认。
+- **设置页** — 设置 → **AniPlus**：总开关、三档强度、分组开关、恢复默认。
 
 所有新增动效都在 `prefers-reduced-motion: no-preference` 下生效；系统要求减少动态效果时，插件不添加任何动效。
 
 ## 安装
 
-克隆仓库：
+### 从 npm 安装
+
+```sh
+dsh plugin --profile <profile> add dsh-aniplus
+```
+
+### 从发布包安装
+
+从 [Releases](https://github.com/uwuAitry/AniPlus/releases) 下载
+`dsh-aniplus-<version>.tgz`，然后：
+
+```sh
+dsh plugin --profile <profile> add ./dsh-aniplus-<version>.tgz
+```
+
+### 从源码安装
 
 ```sh
 git clone https://github.com/uwuAitry/AniPlus.git
+dsh plugin --profile <profile> add ./AniPlus
 ```
-
-然后任选其一：
-
-1. 从 npm 安装：
-
-   ```sh
-   dsh plugin --profile <profile> add dsh-aniplus
-   ```
-
-2. 或安装克隆下来的目录：
-
-   ```sh
-   dsh plugin --profile <profile> add <AniPlus 路径>
-   ```
 
 bundle id 是 `dsh-aniplus`，显示名为 **dsh-AniPlus**。如果插件行提示 `restart-required`，重启一次 DSH。
 
@@ -102,11 +121,12 @@ bundle id 是 `dsh-aniplus`，显示名为 **dsh-AniPlus**。如果插件行提�
 ## 开发
 
 ```sh
-node verify.mjs
+node verify.mjs   # 对本机安装的 DSH 做离线契约检查
 ```
 
 检查内容：manifest、locale、图标大小、CSS 大括号平衡、keyframe 命名、选择器对应的宿主属性、
 slot 名称、reduced-motion 包裹，以及退出 ghost 使用的唯一有界 `MutationObserver`。
+可以通过 `DSH_INSTALL_DIR` 指向另一套 DSH 安装。
 
 ```text
 AniPlus/
@@ -122,6 +142,38 @@ AniPlus/
 ├─ verify.mjs
 └─ LICENSE
 ```
+
+## 发布（维护者）
+
+1. 运行离线检查：
+
+   ```sh
+   node verify.mjs
+   ```
+
+2. 更新 `package.json` 版本号，提交并打标签：
+
+   ```sh
+   git commit -am "release: vX.Y.Z"
+   git tag -a vX.Y.Z -m "AniPlus vX.Y.Z"
+   git push origin main vX.Y.Z
+   ```
+
+3. 构建并发布 tarball：
+
+   ```sh
+   npm pack                      # 或: pnpm pack
+   npm publish dsh-aniplus-<version>.tgz --access public
+   ```
+
+   `publishConfig.access` 已设为 `public`；发布需要一个带 `automation` 权限的 npm 账号
+   （`npm login` 或 `NPM_TOKEN`）。
+
+4. 把 tarball 挂到 GitHub Release：
+
+   ```sh
+   gh release create vX.Y.Z dsh-aniplus-<version>.tgz --title "AniPlus vX.Y.Z" --generate-notes
+   ```
 
 ## License
 
