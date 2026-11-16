@@ -40,7 +40,7 @@ syntaxCheck('client.js')
 
 const pkg = readJson('package.json')
 check(pkg.name === 'dsh-aniplus', 'package name must be dsh-aniplus')
-check(pkg.version === '0.1.0', 'package version must be 0.1.0')
+check(pkg.version === '0.2.0', 'package version must be 0.2.0')
 check(pkg.type === 'module', 'package must be type: module')
 check(pkg.private !== true, 'package must be publishable to npm')
 check(pkg.license === 'MIT', 'package license must be MIT')
