@@ -35,7 +35,7 @@ dsh-AniPlus 是一个客户端 DSH 插件，为菜单、窗口、列表、侧栏
 - **列表与对话** — 会话、文件、插件、计划任务行，以及对话区最后几行做轻微上浮淡入，不干扰宿主 FLIP 动画。
 - **微交互** — Switch 滑块回弹、SegmentedTabs 指示条滑动、行 hover 位移、滚动到底按钮弹入。
 - **底部信息面板** — 底部信息指示器（上下文用量、统计药丸）的弹出面板从触发器上浮进入，带弹性位移 + 缩放与模糊入场；关闭时经 ghost 原路向下收回触发器。
-- **按压反馈** — 小型菜单面板跟随指针轻微倾斜（阻尼插值、离开后平滑回弹），底部触发器按下时轻微下沉（移植自 Miuix SinkFeedback）。
+- **按压反馈** — 小型菜单面板在指针按压时轻微倾斜（阻尼插值、松手平滑回弹），所有按钮按下时轻微下沉（移植自 Miuix SinkFeedback）。
 - **设置页** — 设置 → **AniPlus**：总开关、三档强度、分组开关、恢复默认。
 
 所有新增动效都在 `prefers-reduced-motion: no-preference` 下生效；系统要求减少动态效果时，插件不添加任何动效。
@@ -87,12 +87,12 @@ bundle id 是 `dsh-aniplus`，显示名为 **dsh-AniPlus**。如果插件行提�
 | `--anip-ease-standard` | `cubic-bezier(0.22, 1, 0.36, 1)` | 结构位移，同时替换全局 `--ds-ease-in-out` |
 | `--anip-ease-exit` | `cubic-bezier(0.4, 0, 1, 1)` | 收回、关闭：加速离开 |
 | `--anip-ease-spring` | `cubic-bezier(0.34, 1.36, 0.64, 1)` | 仅小元素：Toast、Switch、滚动按钮 |
-| `--anip-ease-miuix-popup` / `-sink` | 预计算的 `linear()` 弹性曲线 | 底部面板入场；按压下沉（Miuix） |
+| `--anip-ease-miuix-popup` / `-sink` | 预计算的 `linear()` 弹性曲线 | 底部面板入场；按钮按压下沉（Miuix） |
 | `--anip-ease-miuix-alpha` | `cubic-bezier(0.4, 0, 0.2, 1)` | 底部面板透明度 + 模糊淡出 |
 | `--anip-dock-duration` / `-distance` / `-scale` | `400ms` / `6px` / `0.97`（随强度） | 底部面板入场 |
 | `--anip-tilt-amount` / `--anip-tilt-perspective` | `4deg` / `900px` | 菜单倾斜跟随角度上限 |
 | `--anip-tilt-tau` | `70ms` | 倾斜跟随阻尼时间常数（JS rAF 循环） |
-| `--anip-sink-scale` | `0.94` | 底部触发器按压下沉 |
+| `--anip-sink-scale` | `0.94` | 按钮按压下沉 |
 | `--anip-press-sink-duration` | `320ms` | 按压下沉回弹 |
 
 时长采用 90 / 150 / 200 / 280–320ms 层级；位移控制在 `2–12px`，缩放保持在 `0.96–0.99`。

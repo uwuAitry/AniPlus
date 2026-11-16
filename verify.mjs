@@ -190,6 +190,11 @@ check(client.includes("INTENSITIES = ['subtle', 'standard', 'expressive']"), 'se
 check(client.includes("'data-anip-ready'"), 'client must gate initial entrance replay with data-anip-ready')
 check(css.includes('[style*="--dsh-model-anchor"]'), 'model selector needs a bottom-origin menu override')
 check(client.includes("getPropertyValue('--dsh-model-anchor')"), 'model selector ghost exit must read its anchor property')
+check(client.includes("PRESS_SELECTOR = 'button'"), 'press feedback must cover every button')
+check(client.includes('function animatePress('), 'button press bounce must be implemented')
+check(client.includes("getPropertyValue('--anip-ease-miuix-sink')"), 'press bounce must source the Miuix sink curve')
+check(client.includes("getPropertyValue('--anip-press-sink-duration')"), 'press bounce must source the press duration token')
+check(css.includes('button:focus-visible'), 'buttons need a keyboard focus ring')
 
 /* -------------------------------------------------------------------- report -- */
 

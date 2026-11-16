@@ -14,9 +14,9 @@
 | `--anip-dock-duration` | `400ms` (subtle 340 / expressive 460) | dock panel translate + scale |
 | `--anip-dock-distance` | `6px` (3 / 10) | dock panel rise distance |
 | `--anip-dock-scale` | `0.97` (0.99 / 0.96) | dock panel initial scale |
-| `--anip-tilt-amount` | `4deg` (3 / 5) | menu tilt-follow angle cap (hover-follow; read by JS) |
+| `--anip-tilt-amount` | `4deg` (3 / 5) | menu tilt-follow angle cap (press-follow; read by JS) |
 | `--anip-tilt-perspective` | `900px` | menu tilt-follow perspective |
-| `--anip-tilt-tau` | `70ms` | tilt follow damping time constant (read by JS on pointer enter) |
+| `--anip-tilt-tau` | `70ms` | tilt follow damping time constant (read by JS on pointer press) |
 | `--anip-sink-scale` | `0.94` (0.96 / 0.93) | dock trigger press sink |
 | `--anip-press-sink-duration` | `320ms` | press sink settle |
 
@@ -53,8 +53,8 @@
 | Segmented tabs | `[role="tablist"] > span:first-child` | indicator glide | same |
 | Page panels | `[data-global-panel] > [data-slot="main"] > *` | 8px rise + fade + 2px blur | ghost not used |
 | Dock info panel (ContextMeter / StatsPills) | `[style*="position-anchor: --dsh-context-"]`, `[style*="position-anchor: --dsh-stat-"]` | rise + `scale` (popup spring, 400ms) + blur-in | retract via `exits` ghost: down toward the trigger (menu vector) |
-| Menu tilt-follow | `[data-menu-material="translucent"]` (guarded to ≤420×480px) | pointer-follow tilt via damped rAF loop, angle cap `--anip-tilt-amount` | smooth rebound after pointer leaves |
-| Press sink | `[data-composer-dock] button[aria-haspopup="dialog"]` | sink `scale` on pointerdown | springs back on release |
+| Menu tilt-follow | `[data-menu-material="translucent"]` (guarded to ≤420×480px) | press-follow tilt via damped rAF loop, engages on pointerdown; angle cap `--anip-tilt-amount` | smooth rebound on release |
+| Press sink | any `button` | sink `scale` on pointerdown (WAAPI) | springs back on release |
 
 ## Timing rules
 

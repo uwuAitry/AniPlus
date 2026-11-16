@@ -374,14 +374,14 @@ window.__ModuleLoader__.load({
     /* ------------------------------------------------------- press feedback -- */
 
     const TILT_SELECTOR = '[data-menu-material="translucent"]';
-    const SINK_SELECTOR = '[data-composer-dock] button[aria-haspopup="dialog"]';
+    const PRESS_SELECTOR = 'button';
 
     /**
-     * Miuix SinkFeedback port plus a pointer-follow tilt, refactored:
-     * tilt now tracks the pointer continuously over small menu panels only,
-     * driven by a damped rAF loop (tilt-refactor: no corner quantization, no
-     * CSS transition on transform) and rebounds smoothly after the pointer
-     * leaves. Dock triggers keep the press sink. One element at a time.
+     * Miuix SinkFeedback port plus a press-follow tilt: every button gets the
+     * press sink (WAAPI keeps host transitions untouched), while tilt engages
+     * only on small menu panels, follows the pointer through a damped rAF loop
+     * (no CSS transition on transform) and rebounds smoothly on release. One
+     * pressed button and one tilted panel at a time.
      */
     function installPressFeedback(settings) {
       if (typeof document === 'undefined' || typeof window === 'undefined') return () => {};
@@ -407,6 +407,60 @@ window.__ModuleLoader__.load({
         return current.enabled && current.groups.press && !reduced.matches;
       }
 
+      const pressAnimations = new WeakMap();
+
+      /**
+       * Read the Miuix SinkFeedback tokens from the button itself. The values
+       * stay in CSS so intensity profiles and theme overrides keep working.
+       */
+      function pressTokensOf(el) {
+        const style = window.getComputedStyle(el);
+        const scale = Number.parseFloat(style.getPropertyValue('--anip-sink-scale'));
+        const duration = Number.parseFloat(style.getPropertyValue('--anip-press-sink-duration'));
+        const easing = style.getPropertyValue('--anip-ease-miuix-sink').trim();
+        if (!Number.isFinite(scale) || !Number.isFinite(duration) || easing === '') return null;
+        return { scale, duration, easing };
+      }
+
+      function animatePress(el, target) {
+        if (typeof el.animate !== 'function' || !window.CSS || !window.CSS.supports('scale', '1')) return;
+        const tokens = pressTokensOf(el);
+        if (tokens === null) return;
+        const current = Number.parseFloat(window.getComputedStyle(el).scale);
+        const previous = pressAnimations.get(el);
+        if (previous !== undefined) previous.cancel();
+        let animation;
+        try {
+          animation = el.animate(
+            [{ scale: String(Number.isFinite(current) ? current : 1) }, { scale: String(target === 'sink' ? tokens.scale : 1) }],
+            { duration: tokens.duration, easing: tokens.easing, fill: 'forwards' }
+          );
+        } catch {
+          /* A browser without linear() support keeps the static button; motion is optional. */
+          return;
+        }
+        pressAnimations.set(el, animation);
+        animation.onfinish = () => {
+          if (pressAnimations.get(el) !== animation) return;
+          pressAnimations.delete(el);
+          if (target !== 'sink') animation.cancel();
+        };
+      }
+
+      function releasePress() {
+        if (pressed === null) return;
+        const el = pressed;
+        pressed = null;
+        if (el.isConnected && allowed()) {
+          animatePress(el, 'rest');
+          return;
+        }
+        const animation = pressAnimations.get(el);
+        if (animation !== undefined) {
+          animation.cancel();
+          pressAnimations.delete(el);
+        }
+      }
       function clearTilt(el) {
         if (el === null) return;
         el.style.removeProperty('--anip-tilt-rx');
@@ -421,7 +475,7 @@ window.__ModuleLoader__.load({
       }
 
       // tilt-refactor: one damped-lerp loop owns the whole tilt lifecycle:
-      // follow while the pointer is inside, rebound to rest after it leaves,
+      // follow while the pointer is pressed, rebound to rest on release,
       // and self-stop once settled (vars removed so CSS falls back to 0deg).
       function frame(now) {
         raf = 0;
@@ -451,7 +505,7 @@ window.__ModuleLoader__.load({
 
       function beginTracking(el) {
         const rect = el.getBoundingClientRect();
-        if (rect.width < 1 || rect.height < 1 || rect.width > TILT_MAX_WIDTH || rect.height > TILT_MAX_HEIGHT) return;
+        if (rect.width < 1 || rect.height < 1 || rect.width > TILT_MAX_WIDTH || rect.height > TILT_MAX_HEIGHT) return false;
         const maxDeg = Math.abs(parseFloat(window.getComputedStyle(el).getPropertyValue('--anip-tilt-amount')) || 0) || 4;
         if (tracked !== null && tracked.el !== el) clearTilt(tracked.el);
         tracked = { el, maxDeg };
@@ -461,58 +515,49 @@ window.__ModuleLoader__.load({
         tryTarget = 0;
         last = window.performance.now();
         if (raf === 0) raf = window.requestAnimationFrame(frame);
+        return true;
       }
 
-      function onPointerOver(event) {
-        if (!allowed()) return;
-        const target = event.target;
-        if (!(target instanceof Element)) return;
-        if (tracked !== null && tracked.el.contains(target)) return;
-        const el = target.closest(TILT_SELECTOR);
-        if (el === null) return;
-        beginTracking(el);
+      function aimTiltAt(el, event) {
+        const rect = el.getBoundingClientRect();
+        const nx = Math.max(-1, Math.min(1, ((event.clientX - rect.left) / rect.width) * 2 - 1));
+        const ny = Math.max(-1, Math.min(1, ((event.clientY - rect.top) / rect.height) * 2 - 1));
+        // Signs keep the Miuix convention: the panel leans into the pointer,
+        // as if the pressed point were pushed down.
+        trx = -ny * tracked.maxDeg;
+        tryTarget = nx * tracked.maxDeg;
       }
 
       function onPointerMove(event) {
         if (tracked === null || raf === 0) return;
         const target = event.target;
         if (!(target instanceof Element) || !tracked.el.contains(target)) return;
-        const rect = tracked.el.getBoundingClientRect();
-        const nx = Math.max(-1, Math.min(1, ((event.clientX - rect.left) / rect.width) * 2 - 1));
-        const ny = Math.max(-1, Math.min(1, ((event.clientY - rect.top) / rect.height) * 2 - 1));
-        // Signs keep the Miuix convention: the panel leans into the pointer,
-        // as if the hovered point were pushed down.
-        trx = -ny * tracked.maxDeg;
-        tryTarget = nx * tracked.maxDeg;
-      }
-
-      function onPointerOut(event) {
-        if (tracked === null) return;
-        const related = event.relatedTarget;
-        if (related instanceof Element && tracked.el.contains(related)) return;
-        trx = 0;
-        tryTarget = 0;
+        aimTiltAt(tracked.el, event);
       }
 
       function onPointerDown(event) {
         if (!allowed()) return;
         const target = event.target;
         if (!(target instanceof Element)) return;
-        const sink = target.closest(SINK_SELECTOR);
-        if (sink !== null) {
-          sink.setAttribute('data-anip-pressed', '');
-          pressed = sink;
+        const button = target.closest(PRESS_SELECTOR);
+        if (button !== null && !button.disabled && button.getAttribute('aria-disabled') !== 'true') {
+          if (pressed !== null && pressed !== button) releasePress();
+          pressed = button;
+          animatePress(button, 'sink');
         }
+        const panel = target.closest(TILT_SELECTOR);
+        if (panel !== null && beginTracking(panel)) aimTiltAt(panel, event);
       }
 
       function onPointerUp() {
-        if (pressed !== null) pressed.removeAttribute('data-anip-pressed');
-        pressed = null;
+        releasePress();
+        if (tracked !== null) {
+          trx = 0;
+          tryTarget = 0;
+        }
       }
 
-      document.addEventListener('pointerover', onPointerOver);
       document.addEventListener('pointermove', onPointerMove);
-      document.addEventListener('pointerout', onPointerOut);
       document.addEventListener('pointerdown', onPointerDown, true);
       window.addEventListener('pointerup', onPointerUp, { passive: true });
       window.addEventListener('pointercancel', onPointerUp, { passive: true });
@@ -520,8 +565,7 @@ window.__ModuleLoader__.load({
         if (!allowed()) {
           trx = 0;
           tryTarget = 0;
-          if (pressed !== null) pressed.removeAttribute('data-anip-pressed');
-          pressed = null;
+          releasePress();
         }
       });
 
@@ -529,11 +573,8 @@ window.__ModuleLoader__.load({
         stopLoop();
         clearTilt(tracked === null ? null : tracked.el);
         tracked = null;
-        if (pressed !== null) pressed.removeAttribute('data-anip-pressed');
-        pressed = null;
-        document.removeEventListener('pointerover', onPointerOver);
+        releasePress();
         document.removeEventListener('pointermove', onPointerMove);
-        document.removeEventListener('pointerout', onPointerOut);
         document.removeEventListener('pointerdown', onPointerDown, true);
         window.removeEventListener('pointerup', onPointerUp);
         window.removeEventListener('pointercancel', onPointerUp);
@@ -1026,22 +1067,20 @@ html[data-anip="on"] [data-menu-material="translucent"] {
   }
 }
 
-/* 09b — press feedback (tilt-refactor: hover-follow tilt on small menu
-   panels; the damped rAF loop in installPressFeedback owns the motion, so
-   there is deliberately no CSS transition on transform. Dock triggers keep
-   the press sink). */
+/* 09b — press feedback (tilt-refactor: press-follow tilt on small menu
+   panels, active only while the pointer is pressed; the damped rAF loop in
+   installPressFeedback owns the motion. Every button gets a WAAPI press sink,
+   so no CSS transition is used for it either). */
 @media (prefers-reduced-motion: no-preference) {
   html[data-anip="on"][data-anip-ready]:not(.anip-off-press) [data-menu-material="translucent"] {
     transform: perspective(var(--anip-tilt-perspective)) rotateX(var(--anip-tilt-rx, 0deg)) rotateY(var(--anip-tilt-ry, 0deg));
     transform-origin: center;
   }
-  html[data-anip="on"]:not(.anip-off-press) [data-composer-dock] button[aria-haspopup="dialog"] {
-    scale: 1;
-    transition: scale var(--anip-press-sink-duration) var(--anip-ease-miuix-sink);
-  }
-  html[data-anip="on"]:not(.anip-off-press) [data-composer-dock] button[aria-haspopup="dialog"][data-anip-pressed] {
-    scale: var(--anip-sink-scale);
-  }
+}
+
+html[data-anip="on"] button:focus-visible {
+  outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: 2px;
 }
 
 /* 10 — settings page (always themed, independent of the motion gate). */
@@ -1116,8 +1155,10 @@ html[data-anip="on"] [data-menu-material="translucent"] {
 .anip-switch[aria-checked="true"] {
   background: var(--dsw-alias-brand-primary);
 }
-.anip-switch:focus-visible {
-  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+.anip-switch:focus-visible,
+.anip-segment-item:focus-visible,
+.anip-reset:focus-visible {
+  outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: 2px;
 }
 .anip-switch-thumb {
