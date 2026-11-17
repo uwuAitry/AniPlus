@@ -530,6 +530,9 @@ window.__ModuleLoader__.load({
 
       function onPointerMove(event) {
         if (tracked === null || raf === 0) return;
+        // tilt-follow only while a button is held: a missed pointerup (e.g. released
+        // outside the window) must not leave the panel leaning and following hovers.
+        if (event.buttons === 0) { onPointerUp(); return; }
         const target = event.target;
         if (!(target instanceof Element) || !tracked.el.contains(target)) return;
         aimTiltAt(tracked.el, event);
